@@ -58,7 +58,7 @@ void MainWindow::InsertCatNode(){
         }
     }
 
-    qDebug()<<zzbds_str;
+    qDebug()<<"zzbds:"<<zzbds_str;
 }
 
 int MainWindow::Precedence(QChar symbol)  //各种符号的优先级  优先数越大优先级越低
@@ -73,14 +73,14 @@ int MainWindow::Precedence(QChar symbol)  //各种符号的优先级  优先数�
 
 void MainWindow::RegExpToPost(){//将正则表达式转换成逆波兰式（后缀形式）
     QString exp = zzbds_str;
-    qDebug()<<exp;
+//    qDebug()<<exp;
 //    int i = 0, j = 0;
     QChar ch, cl;
     QString post = "";
     QStack<QChar> ls;
 
     ch = exp[0];
-
+    ls.push('#');
     while (!exp.isEmpty())
     {
         if (ch == '(')
@@ -88,43 +88,31 @@ void MainWindow::RegExpToPost(){//将正则表达式转换成逆波兰式（后�
             ls.push(ch);    //进栈
             exp.remove(0,1);
             ch = exp[0];
+            qDebug()<<"(:"<<ch;
         }
         else if (ch == ')')
         {
-            QChar tmp = ls.top();
-            while (!ls.empty()&& tmp!= '(')//出栈括号里的内容
-            {
-                post += tmp;
-                ls.pop();
-                if(!ls.empty()){
-                    tmp = ls.top();
-                }
-                if(ls.empty()) break;
 
+            while (ls.top()!= '(')//出栈括号里的内容
+            {
+                post += ls.pop();
             }
-            if(!ls.empty())
+
             ls.pop();      //把（出栈
             exp.remove(0,1);
             ch = exp[0];
         }
         else if ((ch == '|') || (ch == '*') || (ch == '.'))//ch:*  3
         {
-            if(!ls.empty())
-            {
-                cl = ls.top();//cl:. 2
-                while (Precedence(cl) >= Precedence(ch))
-                {
-                    post += cl;
-                    if(!ls.empty())
-                    ls.pop();
-                    else break;
-                    if(!ls.empty())
-                    cl = ls.top();
 
-                }
+            cl = ls.top();//cl:. 2
+            while (Precedence(cl) >= Precedence(ch))
+            {
+                post += cl;
+                ls.pop();
+                cl = ls.top();
             }
             ls.push(ch);
-
             exp.remove(0,1);
             ch = exp[0];
         }
@@ -136,18 +124,23 @@ void MainWindow::RegExpToPost(){//将正则表达式转换成逆波兰式（后�
         }
     }
 
-
-    while (!ls.empty())
+    ch = ls.pop();
+//    while (!ls.empty())
+//    {
+//        post += ls.pop();
+//    }
+    while ((ch == '|') || (ch == '*') || (ch == '.'))
     {
-        post += ls.pop();
+        post += ch;
+        exp.remove(0,1);
+        ch = ls.pop();
     }
-
 
 
     ls.clear();
 
     zzbds_niPolan = post;
-    qDebug()<<zzbds_niPolan;
+    qDebug()<<"逆波兰式"<<zzbds_niPolan;
 
 }
 
@@ -238,9 +231,28 @@ void MainWindow::Move(QChar ch, int v,QVector<int>&vis)
             Move(ch, i,vis);
         }
     }
+
     return;
 }
 
+
+void MainWindow::Move1(QChar ch, int v, QVector<int> &vis){
+    if (vis.contains(v)) {
+        return;
+    }
+    // 遍历所有可能的状态转移
+    for (int i = 0; i < NFAStatesNumber; i++) {
+        // 如果存在从当前状态到状态i的转移，且该转移的字符为ch，则递归地对状态i调用Move函数
+        QChar c =  tableData[v][i][0];  //表元素的第一位
+        if ( c == ch) {
+//            qDebug()<<c;
+//            qDebug()<<i<<" "<<vis.size();
+            vis.push_back(i);
+            Move(ch, i,vis);
+        }
+    }
+    return;
+}
 
 void MainWindow::tst(){
     QVector<int>visit;
@@ -254,8 +266,8 @@ void MainWindow::tst(){
 //        }
 //    }
 }
-
-void MainWindow::SubsetConstruction()  //史山
+/*
+void MainWindow::SubsetConstruction()  //史山    如果move(A,a)中没有找到任意一个点连接a,那么就留空.
 {
     GetEdgeNumber();//得到压缩的点集
 
@@ -285,6 +297,9 @@ void MainWindow::SubsetConstruction()  //史山
             for(int j=0;j<ls[idx].size();j++){  //对于行表头容器里的每一个元素
                 Move(Edgenumber[i],ls[idx][j],visit_1);   //如果第一个是a ,那么得到visit_0中每一个元素直接经过a得到的点集
             }
+
+//            qDebug()<<"操作完第"<<idx<<"次第"<<i<<"列"<<"得到的";
+//            for(int j=0;j<visit_1.size();j++) qDebug()<<visit_1[j];
 
             //以上操作得到了一个由行表头数组延伸a（例子）得到的数组
             //以下还需要做的操作：如果visit_1(刚刚得到的整个数组)中有母数组出现过的，要删掉，只留下经过a得到的结果。
@@ -342,11 +357,94 @@ void MainWindow::SubsetConstruction()  //史山
     DFAinit_row_sz = sz;
     DFAinit_col_sz = Edgenumber.length();
 }
+*/
+void MainWindow::SubsetConstruction()
+{//子集构造法
+    GetEdgeNumber();
+    int cnt = NFAStatesNumber;
+    QVector<QVector<int> >numList;
+    for(int i=0;i<cnt;i++){
+        QVector<int> tmp;
+        Move('~',i,tmp);
+        numList.push_back(tmp);
+    }
+    //以上得到每一个数字通过~得到的集合。
+    QSet<QVector<int> >visit_x; //一个hash
+    ls.push_back(numList[0]);
+    int sz = ls.size();
+//    qDebug()<<"ls.size:"<<sz;
+//    qDebug()<<"num[0]"<<numList[0].size();
+    int index = 0;
+    DFA_temp0[index] = numList[0];
+    DFA_temp1[numList[0]]=index++;
+    for(int i=0;i<numList.size();i++){
+        qDebug()<<"nlist"<<numList[i].size();
+    }
+    qDebug()<<"完成DFA的准备";
+    for(int i=0;i<sz;i++)//行
+    {
+        qDebug()<<"DFA第"<<i<<"行";
+        for(int j=0;j<Edgenumber.length();j++)//列
+        {
+            qDebug()<<"DFA第"<<j<<"列";
+            QVector<int> visit_1;//新建一个容器
+            visit_1.clear();
+            for(int k=0;k<ls[i].size();k++)
+            {
+                Move1(Edgenumber[j],ls[i][k],visit_1);//跑a,b;
+            }
+            qDebug()<<i<<" "<<j<<":"<<visit_1.size();
+            //得到的是move(A,a)如果是空的，那么就可以退出这轮循环了。
+            if(visit_1.empty()){
+                QVector<int> a;
+                DFA_Map[ls[i]][Edgenumber[j]]=a;
+                DFA_daiti_Map[DFA_temp1[ls[i]]][Edgenumber[j]]=-1;
+                continue;
+            }
+            else
+            {
+                QVector<int> ans;
+                for(int k=0;k<visit_1.size();k++)
+                {
+                    for(int r=0;r<numList[visit_1[k]].size();r++){
+                        if(!ans.contains(numList[visit_1[k]][r])) ans.push_back(numList[visit_1[k]][r]);
+                    }
+                }
+                qDebug()<<"第"<<i<<"行 第"<<j<<"列："<<visit_1.size();
+                //以上操作得到的是A或者是B;
+                if(!visit_x.contains(ans))
+                {
+                    visit_x.insert(ans);
+                    ls.push_back(ans);
+                    sz++;
+                    qDebug()<<"sz"<<sz;
+                    qDebug()<<"ans.size"<<ans.size();
+                    DFA_temp0[index] = ans;
+                    DFA_temp1[ans] = index++;
+
+                }
+                DFA_Map[ls[i]][Edgenumber[j]]=ans;
+                DFA_daiti_Map[DFA_temp1[ls[i]]][Edgenumber[j]] = DFA_temp1[ans];
+            }
+            //
+
+        }
+    }
+
+    DFAinit_row_sz = sz;
+    DFAinit_col_sz = Edgenumber.length();
+    qDebug()<<"sz"<<sz;
+//    for(int i=0;i<4;i++){
+//        qDebug()<<DFA_daiti_Map[i][Edgenumber[0]]<<" "<<DFA_daiti_Map[i][Edgenumber[1]];
+//    }
+}
+
 
 void MainWindow::devideDFA()
 {
     int ending = NFAStatesNumber - 1;  //在例子中是10
     int item_num = DFAinit_row_sz;
+    qDebug()<<"itemnum"<<item_num;
     //接下来处理DFA出现的情况数。从0到3（标号）代表的数组中，只要数组中出现了10，就进入终态集，否则进入非终态集。
     for(int i=0;i<item_num;i++){
         if(DFA_temp0[i].contains(ending)){   //代号 代表的数组 中是否含有10
@@ -369,10 +467,10 @@ void MainWindow::devideDFA()
     //这里分配没有问题
     QVector<int>t1=zhongt;
     QVector<int>t2=feizhongt;
-    qDebug()<<"终态";
 
-//    for(int i=0;i<t1.size();i++) qDebug()<<t1[i];
 
+    for(int i=0;i<t2.size();i++) qDebug()<<"非终态："<<t2[i];
+    for(int i=0;i<t1.size();i++) qDebug()<<"终态："<<t1[i];
     //处理终态
     for(int i=0;i<Edgenumber.length();i++){  //a b
 
@@ -387,7 +485,7 @@ void MainWindow::devideDFA()
             if(zhongt.contains(ttmp)){  //通过一步到终态集了。
                 yes.push_back(t1[j]);
             }
-            else {
+            else {//往后找字母
                 int flag=1;
                 for(int k=i+1;k<Edgenumber.length();k++){
                     QChar cch = Edgenumber[k];
@@ -403,7 +501,7 @@ void MainWindow::devideDFA()
 
         }
         //上面完成后，分别得到指向终态和指向非终态的。yes的放入容器中
-//用指向非终态的作为操作数组进行递推。
+        //用指向非终态的作为操作数组进行递推。
         terminal.push_back(yes);
 //        qDebug()<<"ternmal_yes_sz"<<yes.size();
 //        for(int i=0;i<zhongt.size();i++) qDebug()<<yes[i];
@@ -411,7 +509,7 @@ void MainWindow::devideDFA()
         t1=no;
         if(t1.isEmpty())break;//分类完成
     }
-
+    qDebug()<<"终态完成";
     //处理非终态
     for(int i=0;i<Edgenumber.length();i++){  //a b
 
@@ -449,13 +547,13 @@ void MainWindow::devideDFA()
         t2=no;
         if(t2.isEmpty())break;//分类完成
     }
-
+qDebug()<<"非终态完成";
     for(int i=0;i<item_num;i++) DFA_rows.push_back(i);//行表头  等下用来删
 
-//    qDebug()<<"terminalsize"<<terminal.size()<<"interminalsize"<<interminal.size();
-//    for(int i=0;i<DFAinit_row_sz;i++){
-//       qDebug()<<DFA_daiti_Map[i][Edgenumber[1]];
-//    }
+    qDebug()<<"terminalsize"<<terminal.size()<<"interminalsize"<<interminal.size();
+    for(int i=0;i<DFAinit_row_sz;i++){
+       qDebug()<<DFA_daiti_Map[i][Edgenumber[1]];
+    }
 
 
     //至此得到了二维容器。下面操作这些容器，合并
@@ -576,6 +674,11 @@ void MainWindow::show_terminal_DFA()
     for (int i = 0; i < row_sz; i++) {
         for (int j = 0; j < DFAinit_col_sz; j++) {
             int value = DFA_daiti_Map[DFA_rows[i]][Edgenumber[j]];
+            if(value==-1) {
+                QTableWidgetItem *item = new QTableWidgetItem("");
+                DFAminTable->setItem(i, j, item);
+                continue;
+            }
             QString val = "";
 
             QString num = QString::number(value);
@@ -812,6 +915,130 @@ void MainWindow::ThompsonConstruction()
     qDebug()<<NFAStatesNumber;
 }
 
+
+
+void MainWindow::generateCode() {
+    qDebug()<<"ac";
+    codelist.clear();
+    codelist.append("#include<bits/stdc++.h>");
+    codelist.append("using namespace std;");
+
+    QStringList edgelist;
+
+    for(int i=0;i<Edgenumber.length();i++){
+        QString s="";
+        s+=Edgenumber[i];
+        edgelist.append(s);
+    }
+    qDebug()<<"ac1";
+    //edge
+    qDebug()<<edgelist.size();
+    QString str="char edge[]={";
+    for(const QString&ch :edgelist){
+        edgelist+="'"+ch+"',";
+    }
+    str.chop(2);
+    str +="};";
+
+    codelist.append(str);
+    str.clear();
+    qDebug()<<"ac2";
+    //dfa
+    str = "int DFA";
+    int row = DFA_rows.size();
+    qDebug()<<"row:"<<row;
+    int col = Edgenumber.length();
+    QString tmp = "";
+    QString num = QString::number(row);
+    tmp+=("["+num+"]");
+    num = QString::number(col);
+    tmp+=("["+num+"]");
+    tmp+="=";
+    tmp+="{";
+    for(int i=0;i<row;i++){
+        tmp+="{";
+        for(int j=0;j<Edgenumber.length();j++){
+            if(j==Edgenumber.length()-1){
+                num=QString::number(DFA_daiti_Map[DFA_rows[i]][Edgenumber[j]]);
+                tmp+=num;
+            }
+            else {
+                num=QString::number(DFA_daiti_Map[DFA_rows[i]][Edgenumber[j]]);
+                tmp+=num;
+                tmp+=",";
+            }
+        }
+        tmp+="}";
+    }
+    tmp+="};";
+    str+=tmp;
+    tmp="";
+    codelist.append(str);
+    qDebug()<<"ac3";
+    //pos
+    str = "int getpos(char c){";
+    codelist.append(str);
+    str = "int i=0,pos=-1;";
+    codelist.append(str);
+    str = "for(int i=0;i<";
+    num=QString::number(col);
+    str+=num;
+    str+=";i++){";
+    codelist.append(str);
+    str="if(edge[i]==c)pos=i;}";
+    codelist.append(str);
+    str = "return pos;}";
+    codelist.append(str);
+    qDebug()<<"ac4";
+    //main
+    str = "int main(){";
+    codelist.append(str);
+    str = "int j=0,start=0,column;";
+    codelist.append(str);
+    str = "char *str = new char[256];";
+    codelist.append(str);
+    str="cin>>str";
+    codelist.append(str);
+    str = "while(str[j]!='\\0'){";
+    codelist.append(str);
+    str = "switch(str[j]){";
+    codelist.append(str);
+
+    for(int i=0;i<Edgenumber.length();i++){
+        str = "case '"+edgelist[0]+"':";
+        codelist.append(str);
+        str = "column = getPos(str[j]);";
+        codelist.append(str);
+        str = "if (column != -1 && start!=-1) { ";
+        codelist.append(str);
+        str = "start = DFA[start][column];}";
+        codelist.append(str);
+        str = "else{";
+        codelist.append(str);
+        str = "cout << \"NO\"<<endl;";
+        codelist.append(str);
+        str = "return -1;}break;";
+        codelist.append(str);
+    }
+    str = "default:";
+    codelist.append(str);
+    str = "cout<<\"NO\"<<endl;";
+    codelist.append(str);
+    str = "return -1;";
+    codelist.append(str);
+    str = "break;";
+    codelist.append(str);
+    str = "}";
+    codelist.append(str);
+    str = "j++;}";
+    codelist.append(str);
+    str = "cout<<\"YES\"<<endl;return 0;}";
+    codelist.append(str);
+
+}
+
+
+
 void MainWindow::on_pushButton_buildNFA_clicked()
 {
     ui->tableWidget_showtable->clear();
@@ -823,11 +1050,11 @@ void MainWindow::on_pushButton_buildNFA_clicked()
 
 void MainWindow::on_pushButton_buildDFA_clicked()
 {
-    ui->tableWidget_showtable->clear();
-    NFATable = ui->tableWidget_showtable;
-    InsertCatNode();
-    RegExpToPost();
-    ThompsonConstruction();
+//    ui->tableWidget_showtable->clear();
+//    NFATable = ui->tableWidget_showtable;
+//    InsertCatNode();
+//    RegExpToPost();
+//    ThompsonConstruction();
     //以上目的是得到NFAtable
     GetEdgeNumber();//从逆波兰式中得到colsize
     change();
@@ -841,20 +1068,60 @@ void MainWindow::on_pushButton_buildDFA_clicked()
 
 void MainWindow::on_pushButton_minDFA_clicked()
 {
-    ui->tableWidget_showtable->clear();
-    NFATable = ui->tableWidget_showtable;
-    InsertCatNode();
-    RegExpToPost();
-    ThompsonConstruction();
-    //以上目的是得到NFAtable
-    GetEdgeNumber();//从逆波兰式中得到colsize
-    change();
-    SubsetConstruction();//DFA构造算法
-    ui->tableWidget_showtable->clear();//展示之前清空列表
-    DFAinitTable = ui->tableWidget_showtable;//指向dfa表
-    showinitDFA();//展示DFA
+//    ui->tableWidget_showtable->clear();
+//    NFATable = ui->tableWidget_showtable;
+//    InsertCatNode();
+//    RegExpToPost();
+//    ThompsonConstruction();
+//    //以上目的是得到NFAtable
+//    GetEdgeNumber();//从逆波兰式中得到colsize
+//    change();
+//    SubsetConstruction();//DFA构造算法
+//    ui->tableWidget_showtable->clear();//展示之前清空列表
+//    DFAinitTable = ui->tableWidget_showtable;//指向dfa表
+//    showinitDFA();//展示DFA
     devideDFA();
     ui->tableWidget_showtable->clear();//展示之前清空列表
     DFAminTable = ui->tableWidget_showtable;//指向最小dfa表
     show_terminal_DFA();
 }
+
+
+
+
+void MainWindow::on_pushButton_build_sourcefile_clicked()
+{
+    generateCode();
+    // 创建新窗口
+    QDialog *dialog = new QDialog(this);
+    QVBoxLayout *layout = new QVBoxLayout(dialog);
+
+    // 创建QListView并添加到窗口
+    QListView *listView = new QListView(dialog);
+    layout->addWidget(listView);
+
+    // 将codelist添加到QListView
+    QStringListModel *model = new QStringListModel(codelist, listView);
+    listView->setModel(model);
+
+    // 创建QPushButton并添加到窗口
+    QPushButton *button = new QPushButton("保存到文件", dialog);
+    layout->addWidget(button);
+    connect(button, &QPushButton::clicked, this, [=] {
+        QString filename = QFileDialog::getSaveFileName(this, "保存文件", "", "文本文件 (*.txt)");
+        if (!filename.isEmpty()) {
+            QFile file(filename);
+            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QTextStream out(&file);
+                for (const QString &str : model->stringList()) {
+                    out << str << "\n";
+                }
+            }
+        }
+    });
+
+
+    // 显示窗口
+    dialog->exec();
+}
+

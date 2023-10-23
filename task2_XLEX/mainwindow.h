@@ -9,6 +9,10 @@
 #include <QTableWidgetItem>
 #include <QMap>
 #include <QVector>
+#include <QVBoxLayout>
+#include <QListView>
+#include <QStringListModel>
+#include <QStringList>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -27,12 +31,14 @@ public:
     void ThompsonConstruction();//用tps构造法构造NFA
     void SubsetConstruction();//子集构造法构造DFA
     void Move(QChar ch,int v,QVector<int>&);
+    void Move1(QChar ch,int v,QVector<int>&);
     void GetEdgeNumber();
     void showinitDFA();//展示初始DFA
     void tst();
     void change();
     void devideDFA();//分类DFA集合。
     void show_terminal_DFA();
+    void generateCode();
 
 private slots:
     void on_pushButton_openfile_clicked();
@@ -44,6 +50,8 @@ private slots:
     void on_pushButton_buildDFA_clicked();
 
     void on_pushButton_minDFA_clicked();
+
+    void on_pushButton_build_sourcefile_clicked();
 
 private:
     Ui::MainWindow *ui;
@@ -69,5 +77,6 @@ private:
     QVector<int>feizhongt;//非终态集，内不含子集
     QVector<QVector<int> > interminal;//非终态集
     QVector<int>DFA_rows;//最小化DFA中所用到的
+    QStringList codelist;
 };
 #endif // MAINWINDOW_H
